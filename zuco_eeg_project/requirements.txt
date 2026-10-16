@@ -1,0 +1,8 @@
+torch
+numpy
+scipy
+pandas
+h5py
+scikit-learn
+matplotlib
+sentence-transformers   # only for --text_encoder sbert (default)
