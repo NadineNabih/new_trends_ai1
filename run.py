@@ -26,6 +26,7 @@ for f in fields(Config):
     if f.type in (int, float, str):
         a.add_argument(f"--{f.name}", type=f.type, default=None)
 a.add_argument("--datasets", nargs="+", default=None)
+a.add_argument("--seeds", nargs="+", type=int, default=None, help="e.g. 0 1 2 (different subject/sentence splits)")
 a.add_argument("--tasks", nargs="+", default=None, help="e.g. NR SR TSR (default: all)")
 
 sub.add_parser("plots").add_argument("--out_dir", default="results")
@@ -47,14 +48,17 @@ else:
         cfg.datasets = tuple(args.datasets)
     if args.tasks:
         cfg.tasks = tuple(args.tasks)
-    if args.exp in ("representations", "all"):
-        for ds in cfg.datasets:
-            exp_representations(cfg, ds)
-    if args.exp in ("robustness", "all"):
-        for ds in cfg.datasets:
-            exp_robustness(cfg, ds)
-    if args.exp in ("cross", "all") and len(cfg.datasets) == 2:
-        d1, d2 = cfg.datasets
-        exp_cross(cfg, d1, d2)
-        exp_cross(cfg, d2, d1)
+    for seed in (args.seeds or [cfg.seed]):
+        cfg.seed = seed
+        print(f"\n########## seed {seed}")
+        if args.exp in ("representations", "all"):
+            for ds in cfg.datasets:
+                exp_representations(cfg, ds)
+        if args.exp in ("robustness", "all"):
+            for ds in cfg.datasets:
+                exp_robustness(cfg, ds)
+        if args.exp in ("cross", "all") and len(cfg.datasets) == 2:
+            d1, d2 = cfg.datasets
+            exp_cross(cfg, d1, d2)
+            exp_cross(cfg, d2, d1)
     make_plots(cfg)

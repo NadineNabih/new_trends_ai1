@@ -44,7 +44,8 @@ def _ssl_path(cfg, ds, qa, aug):
 
 def _save(rows, cfg, name):
     Path(cfg.out_dir).mkdir(parents=True, exist_ok=True)
-    pd.DataFrame(rows).to_csv(Path(cfg.out_dir) / name, index=False)
+    name = name.replace(".csv", f"_s{cfg.seed}.csv")
+    pd.DataFrame(rows).assign(seed=cfg.seed).to_csv(Path(cfg.out_dir) / name, index=False)
 
 
 # ----------------------------------------------------------------------------- 1. representations
@@ -154,6 +155,7 @@ def make_plots(cfg: Config):
     if reps:
         r = pd.concat(reps)
         r = r[(r.split == "test") & (r.control.isin(["none", "noise_input_at_test", "noise_trained/noise_test"]))]
+        r = r.groupby(["dataset", "recipe", "control"], as_index=False).mean(numeric_only=True)
         fig, axes = plt.subplots(1, r.dataset.nunique(), figsize=(6 * r.dataset.nunique(), 4), squeeze=False)
         for ax, (ds, g) in zip(axes[0], r.groupby("dataset")):
             g = g.assign(label=g.recipe + np.where(g.control == "none", "", "\n(" + g.control + ")"))

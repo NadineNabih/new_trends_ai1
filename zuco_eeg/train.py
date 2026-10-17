@@ -31,7 +31,11 @@ class Config:
     ssl_epochs: int = 30
     ssl_lr: float = 3e-4
     mask_ratio: float = 0.5
-    dec_epochs: int = 30
+    dec_epochs: int = 12
+    patience: int = 4          # early stopping on validation MRR
+    wd: float = 0.05
+    head_hidden: int = 512
+    head_drop: float = 0.3
     lr_head: float = 1e-3
     lr_enc: float = 1e-4
     text_encoder: str = "sbert"     # sbert | tfidf
@@ -108,14 +112,14 @@ def train_decoder(cfg, enc, finetune, train_df, val_df, tv, info, aug=False, noi
     codes, uniq = pd.factorize(train_df.sid)
     Tm = _text_matrix(tv, uniq, dev)
     dl = _loader(cfg, train_df, info, True, codes)
-    head = Projector(enc.out_dim, Tm.shape[1]).to(dev)
+    head = Projector(enc.out_dim, Tm.shape[1], cfg.head_hidden, cfg.head_drop).to(dev)
     groups = [dict(params=head.parameters(), lr=cfg.lr_head)]
     enc_params = [p for p in enc.parameters() if p.requires_grad]
     if enc_params:
         groups.append(dict(params=enc_params, lr=cfg.lr_enc))
-    opt = torch.optim.AdamW(groups, weight_decay=0.01)
+    opt = torch.optim.AdamW(groups, weight_decay=cfg.wd)
     sched = torch.optim.lr_scheduler.CosineAnnealingLR(opt, max(1, cfg.dec_epochs * len(dl)))
-    best, best_state = -1.0, None
+    best, best_state, bad_ep = -1.0, None, 0
     for ep in range(cfg.dec_epochs):
         head.train()
         enc.train(finetune)
@@ -140,10 +144,14 @@ def train_decoder(cfg, enc, finetune, train_df, val_df, tv, info, aug=False, noi
         if len(val_df):
             mt, _ = evaluate(cfg, enc, head, val_df, tv, info, noise_input=noise_input)
             msg += f" | val top5 {mt['top5']:.3f} mrr {mt['mrr']:.3f}"
+            bad_ep = 0 if mt["mrr"] > best else bad_ep + 1
             if mt["mrr"] > best:
                 best = mt["mrr"]
                 best_state = (copy.deepcopy(head.state_dict()), copy.deepcopy(enc.state_dict()) if finetune else None)
         log(msg)
+        if bad_ep >= cfg.patience:
+            log("  early stop")
+            break
     if best_state is not None:
         head.load_state_dict(best_state[0])
         if best_state[1] is not None:
@@ -194,6 +202,14 @@ def retrieval_metrics(Z, codes, subj, Tc, n_perm=200, seed=0):
     # per-subject spread
     ps = [(rank[subj == s] <= 5).float().mean().item() for s in subj.unique()]
     out["top5_subj_mean"], out["top5_subj_std"], out["top5_subj_min"] = float(np.mean(ps)), float(np.std(ps)), float(np.min(ps))
+    # sentence-averaged decoding: average the embeddings of all trials of the same sentence
+    # (different subjects) -> higher signal-to-noise; one prediction per sentence
+    if Ns >= 4:
+        Ma = torch.nn.functional.normalize(torch.zeros(Ns, Z.shape[1]).index_add_(0, codes, Z), dim=-1)
+        sa = Ma @ Tc.T
+        ra = (sa > sa.diag()[:, None]).sum(1) + 1
+        out.update(avg_top1=(ra <= 1).float().mean().item(), avg_top5=(ra <= 5).float().mean().item(),
+                   avg_mrr=(1.0 / ra.float()).mean().item(), avg_chance_top5=min(5, Ns) / Ns)
     # permutation null for top-5
     g = torch.Generator().manual_seed(seed)
     null = []

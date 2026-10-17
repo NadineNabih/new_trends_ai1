@@ -182,7 +182,7 @@ class ZucoEEG(Dataset):
 
 
 # ----------------------------------------------------------------------------- splits
-def make_splits(meta, seed=0, test_subj=0.2, val_subj=0.1, test_sent=0.2, val_sent=0.1):
+def make_splits(meta, seed=0, test_subj=0.2, val_subj=0.15, test_sent=0.2, val_sent=0.15):
     """Subject-held-out AND sentence-held-out splits.
 
     Every subject reads (nearly) the same sentences, so a subject-only split lets the decoder
