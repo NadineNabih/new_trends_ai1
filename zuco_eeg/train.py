@@ -39,6 +39,7 @@ class Config:
     lr_head: float = 1e-3
     lr_enc: float = 1e-4
     text_encoder: str = "sbert"     # sbert | tfidf
+    labels_csv: str = ""           # ZuCo1 sentiment_labels_task1.csv
     cbramod_repo: str = ""
     cbramod_weights: str = ""
 

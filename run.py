@@ -4,6 +4,7 @@ from dataclasses import fields
 
 from zuco_eeg.data import build_cache, inspect_mat
 from zuco_eeg.experiments import exp_cross, exp_representations, exp_robustness, make_plots
+from zuco_eeg.tasks import exp_classification, exp_cls_robust
 from zuco_eeg.train import Config
 
 p = argparse.ArgumentParser()
@@ -21,7 +22,7 @@ a.add_argument("--max_sec", type=float, default=12.0)
 a.add_argument("--max_files", type=int, default=None)
 
 a = sub.add_parser("run", help="run experiments")
-a.add_argument("--exp", default="all", choices=["representations", "robustness", "cross", "all"])
+a.add_argument("--exp", default="all", choices=["representations", "robustness", "cross", "all", "sentiment", "subject", "subject_robust"])
 for f in fields(Config):
     if f.type in (int, float, str):
         a.add_argument(f"--{f.name}", type=f.type, default=None)
@@ -54,6 +55,12 @@ else:
         if args.exp in ("representations", "all"):
             for ds in cfg.datasets:
                 exp_representations(cfg, ds)
+        if args.exp in ("sentiment", "subject"):
+            for ds in cfg.datasets:
+                exp_classification(cfg, ds, args.exp)
+        if args.exp == "subject_robust":
+            for ds in cfg.datasets:
+                exp_cls_robust(cfg, ds, "subject")
         if args.exp in ("robustness", "all"):
             for ds in cfg.datasets:
                 exp_robustness(cfg, ds)

@@ -1,0 +1,10 @@
+Zuco1/
+Zuco2/
+data/
+cache/
+results*/
+*.mat
+*.npy
+*.zip
+__pycache__/
+.venv/
